@@ -22,13 +22,14 @@
   "add bit position and checksum info to file state for each of the files"
   {:state (reduce
            (fn [r {file :file}]
-             (update-in r [file] #(assoc %
-                                    :bit-position (fs/size file)
-                                    :bit-difference (- (fs/size file)
-                                                       (or
-                                                        (:bit-position
-                                                         (*state* file)) 0))
-                                    :checksum (crc-32 (file->bytes file)))))
+             (let [flen (fs/size file)]
+               (update-in r [file] #(assoc %
+                                      :bit-position flen
+                                      :bit-difference (- flen
+                                                         (or
+                                                          (:bit-position
+                                                           (*state* file)) 0))
+                                      :checksum (file-crc-32-len file flen)))))
            *state*
            *events*)})
 

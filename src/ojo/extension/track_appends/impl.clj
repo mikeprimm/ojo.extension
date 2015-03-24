@@ -5,11 +5,17 @@
            java.util.zip.CRC32
            org.apache.commons.io.IOUtils))
 
-(defn crc-32 [bytes]
-  (.getValue (doto (CRC32.) (.update bytes))))
-
-(defn file->bytes [path]
-  (with-open [instr (io/input-stream path)] (IOUtils/toByteArray instr)))
+(defn file-crc-32-len [file len]
+  (with-open [fd (java.io.RandomAccessFile. (fs/file file) "r")]
+    (let [ba (byte-array 65536)
+          crc (CRC32.)]
+      (loop [tlen len
+             rlen (.read fd ba 0 (min len 65536))]
+        (if (> rlen 0)
+          (do 
+            (.update crc ba 0 rlen)
+            (recur (- tlen rlen) (.read fd ba 0 (min (- tlen rlen) 65536))))))
+      (.getValue crc))))
 
 (defn appended-only?
   "check the previously recorded checksum against the crc-32 checksum of the
@@ -18,8 +24,4 @@
    {:keys [bit-position checksum] :as earlier-state}]
   (and
    (<= bit-position (fs/size file))
-   (let [bytes (byte-array bit-position)]
-     (doto (java.io.RandomAccessFile. (fs/file file) "r")
-       (.readFully bytes 0 bit-position)
-       (.close))
-     (= (crc-32 bytes) checksum))))
+   (= (file-crc-32-len file bit-position) checksum)))
