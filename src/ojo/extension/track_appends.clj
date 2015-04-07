@@ -9,27 +9,30 @@
   "add :appended-only? to :modify events when the file has only been appended"
   {:events (map
             (fn [{:keys [kind file] :as event}]
-              (if-not (:bit-position (*state* file))
-                event
-                (let [{:keys [bit-position] :as file-state} (*state* file)]
+              (let [{:keys [bit-position] :as file-state} (*state* file)
+                    [prevmatch newlen newcrc] (verify-update-file-crc-32 file (or bit-position 0) (:checksum file-state))]
+                (if-not bit-position
+                  (assoc-keep event
+                    :checksum newcrc
+                    :bit-end newlen)
                   (assoc-keep event
                     :bit-position bit-position
-                    :appended-only? (when bit-position
-                                      (appended-only? event file-state))))))
+                    :appended-only? prevmatch
+                    :checksum newcrc
+                    :bit-end newlen))))
             *events*)})
 
 (defresponse update-file-info
   "add bit position and checksum info to file state for each of the files"
   {:state (reduce
-           (fn [r {file :file}]
-             (let [flen (fs/size file)]
+           (fn [r {file :file flen :bit-end newcrc :checksum}]
                (update-in r [file] #(assoc %
                                       :bit-position flen
                                       :bit-difference (- flen
                                                          (or
                                                           (:bit-position
                                                            (*state* file)) 0))
-                                      :checksum (file-crc-32-len file flen)))))
+                                      :checksum newcrc)))
            *state*
            *events*)})
 

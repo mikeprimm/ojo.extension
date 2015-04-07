@@ -5,6 +5,24 @@
            java.util.zip.CRC32
            org.apache.commons.io.IOUtils))
 
+(defn verify-update-file-crc-32 [file prevlen prevcrc]
+  "Single pass verify of existing content CRC-32, and calculation of new length and CRC32 - 
+return list with verify result (true/false), new length, and new CRC32"
+  (with-open [fd (java.io.RandomAccessFile. (fs/file file) "r")]
+    (let [ba (byte-array 65536)
+          crcprev (CRC32.)
+          crcnew (CRC32.)
+          newlen (fs/size file)]
+      (loop [tprevlen prevlen
+             tnewlen newlen
+             rlen (.read fd ba 0 (min (max newlen prevlen) 65536))]
+        (if (> rlen 0)
+          (do 
+            (if (> tprevlen 0) (.update crcprev ba 0 (min rlen tprevlen)))
+            (if (> tnewlen 0) (.update crcnew ba 0 (min rlen tnewlen)))
+            (recur (- tprevlen rlen) (- tnewlen rlen) (.read fd ba 0 (min (- (max tnewlen tprevlen) rlen) 65536))))))
+      (list (and (>= newlen prevlen) (= (.getValue crcprev) prevcrc)) newlen (.getValue crcnew)))))
+
 (defn file-crc-32-len [file len]
   (with-open [fd (java.io.RandomAccessFile. (fs/file file) "r")]
     (let [ba (byte-array 65536)

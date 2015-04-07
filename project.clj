@@ -1,4 +1,4 @@
-(defproject ojo.extension "1.0.1"
+(defproject ojo.extension "1.0.2"
   :description "Extensions for ojo file-watching library"
   :url "https://clojars.org/ojo.extension"
   :license {:name "Eclipse Public License"
